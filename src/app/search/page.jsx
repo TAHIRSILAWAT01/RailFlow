@@ -195,7 +195,7 @@ export default function SearchPage() {
       <AppShell>
         <Header title="Search Trains" showBack={false} />
 
-        <div style={{ padding: '24px 20px', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ width: '100%',maxWidth: '1400px',margin: '0 auto', padding: '32px clamp(20px, 3vw, 48px)',boxSizing: 'border-box'}}>
           {/* Hero */}
           <div style={{ marginBottom: '24px' }}>
             <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1a3a5c', lineHeight: 1.2, marginBottom: '4px' }}>

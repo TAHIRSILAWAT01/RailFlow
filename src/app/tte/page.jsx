@@ -236,82 +236,549 @@ function AllocationCard({ allocation }) {
   );
 }
 
-function TrainProgressSimulator({ progress, train, onAdvance, loading }) {
+function TrainProgressSimulator({
+  progress,
+  train,
+  onAdvance,
+  loading
+}) {
   if (!progress || !train) return null;
 
   return (
     <div className="tte-card">
-      <div style={{ fontSize: '11px', color: '#f97316', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '12px' }}>
-        🚆 TRAIN SIMULATOR
+
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '16px'
+      }}>
+        <div>
+          <div style={{
+            fontSize: '11px',
+            color: '#f97316',
+            fontWeight: '700',
+            letterSpacing: '0.5px'
+          }}>
+            🚆 TRAIN JOURNEY
+          </div>
+
+          <div style={{
+            fontSize: '12px',
+            color: '#64748b',
+            marginTop: '3px'
+          }}>
+            Train {TRAIN_ID.replace('T', '')}
+          </div>
+        </div>
+
+        <div style={{
+          background:
+            progress.status === 'TERMINATED'
+              ? '#14532d'
+              : '#1e293b',
+          border:
+            progress.status === 'TERMINATED'
+              ? '1px solid #22c55e'
+              : '1px solid #334155',
+          color:
+            progress.status === 'TERMINATED'
+              ? '#4ade80'
+              : '#94a3b8',
+          padding: '5px 9px',
+          borderRadius: '6px',
+          fontSize: '10px',
+          fontWeight: '700',
+          whiteSpace: 'nowrap'
+        }}>
+          {progress.status === 'TERMINATED'
+            ? '✓ COMPLETED'
+            : '● IN JOURNEY'}
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ background: '#0f172a', borderRadius: '6px', padding: '8px' }}>
-          <div style={{ fontSize: '10px', color: '#64748b' }}>CURRENT STATION</div>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#f97316', marginTop: '2px' }}>
+      {/* Current / Next Station */}
+      <div
+        className="train-station-summary"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px',
+          marginBottom: '20px'
+        }}
+      >
+        <div style={{
+          background: '#0f172a',
+          border: '1px solid #334155',
+          borderRadius: '8px',
+          padding: '10px 12px',
+          minWidth: 0
+        }}>
+          <div style={{
+            fontSize: '9px',
+            color: '#64748b',
+            fontWeight: '700',
+            letterSpacing: '0.4px',
+            marginBottom: '4px'
+          }}>
+            CURRENT STATION
+          </div>
+
+          <div style={{
+            fontSize: '14px',
+            fontWeight: '800',
+            color: '#f97316',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
             {progress.currentStation}
           </div>
         </div>
-        <div style={{ background: '#0f172a', borderRadius: '6px', padding: '8px' }}>
-          <div style={{ fontSize: '10px', color: '#64748b' }}>NEXT STATION</div>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8', marginTop: '2px' }}>
-            {progress.nextStation || '—'}
+
+        <div style={{
+          background: '#0f172a',
+          border: '1px solid #334155',
+          borderRadius: '8px',
+          padding: '10px 12px',
+          minWidth: 0
+        }}>
+          <div style={{
+            fontSize: '9px',
+            color: '#64748b',
+            fontWeight: '700',
+            letterSpacing: '0.4px',
+            marginBottom: '4px'
+          }}>
+            NEXT STATION
+          </div>
+
+          <div style={{
+            fontSize: '14px',
+            fontWeight: '800',
+            color: '#94a3b8',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {progress.nextStation || 'Terminal'}
           </div>
         </div>
       </div>
 
-      {/* Route progress */}
-      <div style={{ marginBottom: '12px', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: '0', minWidth: 'max-content' }}>
-          {train.route.map((code, i) => (
-            <div key={code} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '50%',
-                background: i < progress.currentStationIndex ? '#22c55e'
-                  : i === progress.currentStationIndex ? '#f97316'
-                  : '#1e293b',
-                border: `2px solid ${i < progress.currentStationIndex ? '#22c55e' : i === progress.currentStationIndex ? '#f97316' : '#334155'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, cursor: 'default'
-              }}>
-                {i < progress.currentStationIndex && <span style={{ color: 'white', fontSize: '10px' }}>✓</span>}
-                {i === progress.currentStationIndex && <span style={{ color: 'white', fontSize: '10px' }}>●</span>}
-              </div>
-              {i < train.route.length - 1 && (
+      {/* ==================================================
+          DESKTOP / TABLET JOURNEY
+      ================================================== */}
+      <div
+        className="train-route-desktop"
+        style={{
+          width: '100%',
+          overflowX: 'auto',
+          padding: '8px 4px 18px',
+          marginBottom: '8px'
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          minWidth: `${train.route.length * 72}px`,
+          padding: '0 12px'
+        }}>
+
+          {train.route.map((code, i) => {
+            const isPassed =
+              i < progress.currentStationIndex;
+
+            const isCurrent =
+              i === progress.currentStationIndex;
+
+            const isUpcoming =
+              i > progress.currentStationIndex;
+
+            return (
+              <div
+                key={`${code}-${i}`}
+                style={{
+                  flex: '1 1 0',
+                  minWidth: '64px',
+                  position: 'relative'
+                }}
+              >
+
+                {/* Connector */}
+                {i < train.route.length - 1 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '14px',
+                    left: '50%',
+                    width: '100%',
+                    height: '3px',
+                    background: isPassed
+                      ? '#22c55e'
+                      : '#334155',
+                    zIndex: 0
+                  }} />
+                )}
+
+                {/* Station Node */}
                 <div style={{
-                  width: '20px', height: '2px',
-                  background: i < progress.currentStationIndex ? '#22c55e' : '#334155'
-                }} />
-              )}
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: '0', minWidth: 'max-content', marginTop: '4px' }}>
-          {train.route.map((code, i) => (
-            <div key={code} style={{ display: 'flex', alignItems: 'center', width: '48px' }}>
-              <div style={{
-                fontSize: '9px', color: i === progress.currentStationIndex ? '#f97316' : '#475569',
-                fontWeight: i === progress.currentStationIndex ? '700' : '400',
-                whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '40px', textOverflow: 'ellipsis'
-              }}>
-                {code}
+                  position: 'relative',
+                  zIndex: 1,
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
+                    background:
+                      isPassed
+                        ? '#22c55e'
+                        : isCurrent
+                          ? '#f97316'
+                          : '#1e293b',
+                    border:
+                      isPassed
+                        ? '2px solid #22c55e'
+                        : isCurrent
+                          ? '3px solid #fdba74'
+                          : '2px solid #334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow:
+                      isCurrent
+                        ? '0 0 0 4px rgba(249,115,22,0.12)'
+                        : 'none'
+                  }}>
+                    {isPassed && (
+                      <span style={{
+                        color: 'white',
+                        fontSize: '11px',
+                        fontWeight: '800'
+                      }}>
+                        ✓
+                      </span>
+                    )}
+
+                    {isCurrent && (
+                      <span style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: 'white'
+                      }} />
+                    )}
+
+                    {isUpcoming && (
+                      <span style={{
+                        width: '5px',
+                        height: '5px',
+                        borderRadius: '50%',
+                        background: '#475569'
+                      }} />
+                    )}
+                  </div>
+                </div>
+
+                {/* Station Code */}
+                <div style={{
+                  textAlign: 'center',
+                  marginTop: '8px',
+                  padding: '0 2px'
+                }}>
+                  <div style={{
+                    fontSize: '10px',
+                    fontWeight: isCurrent ? '800' : '600',
+                    color:
+                      isPassed
+                        ? '#4ade80'
+                        : isCurrent
+                          ? '#f97316'
+                          : '#64748b',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {code}
+                  </div>
+
+                  <div style={{
+                    fontSize: '8px',
+                    color: '#475569',
+                    marginTop: '2px'
+                  }}>
+                    {isPassed
+                      ? 'PASSED'
+                      : isCurrent
+                        ? 'CURRENT'
+                        : 'UPCOMING'}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      <button
-        onClick={onAdvance}
-        disabled={loading || progress.status === 'TERMINATED'}
+      {/* ==================================================
+          MOBILE JOURNEY
+      ================================================== */}
+      <div
+        className="train-route-mobile"
         style={{
-          width: '100%', background: progress.status === 'TERMINATED' ? '#1e293b' : '#1d4ed8',
-          color: 'white', border: 'none', padding: '10px', borderRadius: '8px',
-          fontWeight: '700', fontSize: '13px', cursor: loading || progress.status === 'TERMINATED' ? 'not-allowed' : 'pointer'
+          display: 'none'
         }}
       >
-        {loading ? 'Advancing...' : progress.status === 'TERMINATED' ? '✓ Journey Complete' : `▶ ADVANCE TO NEXT STATION (${progress.nextStation || 'Terminal'})`}
+        {train.route.map((code, i) => {
+          const isPassed =
+            i < progress.currentStationIndex;
+
+          const isCurrent =
+            i === progress.currentStationIndex;
+
+          const isLast =
+            i === train.route.length - 1;
+
+          return (
+            <div
+              key={`${code}-mobile-${i}`}
+              style={{
+                display: 'flex',
+                minHeight: isLast ? '48px' : '68px'
+              }}
+            >
+
+              {/* Timeline */}
+              <div style={{
+                width: '34px',
+                position: 'relative',
+                display: 'flex',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+
+                {/* Vertical connector */}
+                {!isLast && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '30px',
+                    bottom: '0',
+                    width: '3px',
+                    background:
+                      isPassed
+                        ? '#22c55e'
+                        : '#334155'
+                  }} />
+                )}
+
+                {/* Node */}
+                <div style={{
+                  position: 'relative',
+                  zIndex: 2,
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background:
+                    isPassed
+                      ? '#22c55e'
+                      : isCurrent
+                        ? '#f97316'
+                        : '#1e293b',
+                  border:
+                    isPassed
+                      ? '2px solid #22c55e'
+                      : isCurrent
+                        ? '3px solid #fdba74'
+                        : '2px solid #334155',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow:
+                    isCurrent
+                      ? '0 0 0 4px rgba(249,115,22,0.12)'
+                      : 'none'
+                }}>
+                  {isPassed && (
+                    <span style={{
+                      color: 'white',
+                      fontSize: '10px',
+                      fontWeight: '800'
+                    }}>
+                      ✓
+                    </span>
+                  )}
+
+                  {isCurrent && (
+                    <span style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      background: 'white'
+                    }} />
+                  )}
+
+                  {!isPassed && !isCurrent && (
+                    <span style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: '#475569'
+                    }} />
+                  )}
+                </div>
+              </div>
+
+              {/* Station Details */}
+              <div style={{
+                flex: 1,
+                minWidth: 0,
+                paddingLeft: '10px',
+                paddingBottom: isLast ? '0' : '14px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
+                }}>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight:
+                      isCurrent ? '800' : '600',
+                    color:
+                      isPassed
+                        ? '#4ade80'
+                        : isCurrent
+                          ? '#f97316'
+                          : '#94a3b8',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {code}
+                  </div>
+
+                  <div style={{
+                    fontSize: '8px',
+                    fontWeight: '700',
+                    letterSpacing: '0.4px',
+                    color:
+                      isPassed
+                        ? '#22c55e'
+                        : isCurrent
+                          ? '#f97316'
+                          : '#475569',
+                    flexShrink: 0
+                  }}>
+                    {isPassed
+                      ? 'PASSED'
+                      : isCurrent
+                        ? 'CURRENT'
+                        : 'UPCOMING'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Journey Status */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '8px',
+        marginTop: '4px',
+        marginBottom: '12px',
+        padding: '8px 10px',
+        background: '#0f172a',
+        borderRadius: '6px',
+        border: '1px solid #1e293b'
+      }}>
+        <span style={{
+          fontSize: '10px',
+          color: '#64748b'
+        }}>
+          JOURNEY PROGRESS
+        </span>
+
+        <span style={{
+          fontSize: '10px',
+          color: '#94a3b8',
+          fontWeight: '700'
+        }}>
+          {progress.currentStationIndex + 1} / {train.route.length} STATIONS
+        </span>
+      </div>
+
+      {/* Advance Button */}
+      <button
+        onClick={onAdvance}
+        disabled={
+          loading ||
+          progress.status === 'TERMINATED'
+        }
+        style={{
+          width: '100%',
+          background:
+            progress.status === 'TERMINATED'
+              ? '#1e293b'
+              : '#1d4ed8',
+          color: 'white',
+          border: 'none',
+          padding: '12px',
+          borderRadius: '8px',
+          fontWeight: '700',
+          fontSize: '13px',
+          cursor:
+            loading ||
+            progress.status === 'TERMINATED'
+              ? 'not-allowed'
+              : 'pointer'
+        }}
+      >
+        {loading
+          ? 'Advancing...'
+          : progress.status === 'TERMINATED'
+            ? '✓ Journey Complete'
+            : `▶ ADVANCE TO NEXT STATION (${
+                progress.nextStation || 'Terminal'
+              })`}
       </button>
+
+      {/* Responsive CSS */}
+      <style jsx>{`
+        @media (max-width: 700px) {
+          .train-route-desktop {
+            display: none !important;
+          }
+
+          .train-route-mobile {
+            display: block !important;
+          }
+
+          .train-station-summary {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (min-width: 701px) {
+          .train-route-mobile {
+            display: none !important;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .train-route-mobile {
+            padding-left: 2px;
+            padding-right: 2px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -424,22 +891,84 @@ export default function TTEPage() {
     }
   }
 
-  async function handleAdvance() {
-    setActionLoading(true);
-    try {
+ async function handleAdvance() {
+  setActionLoading(true);
+
+  try {
+    while (true) {
       const res = await fetch('/api/train-progress/advance', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trainId: TRAIN_ID })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          trainId: TRAIN_ID
+        })
       });
+
       const data = await res.json();
-      if (data.success) {
-        setProgress(data.data);
-        setSuccessMsg(`🚆 Advanced to ${data.data.currentStation}`);
-        await loadAll();
+
+      if (!data.success) {
+        break;
       }
-    } catch { } finally { setActionLoading(false); }
+
+      // Update current station
+      setProgress(data.data);
+
+      setSuccessMsg(
+        `🚆 Advanced to ${data.data.currentStation}`
+      );
+
+      // Refresh passengers, notifications, allocations, etc.
+      await loadAll();
+
+      // Stop if train reached destination
+      if (data.data.status === 'TERMINATED') {
+        setSuccessMsg(
+          `✓ Train reached destination: ${data.data.currentStation}`
+        );
+        break;
+      }
+
+      // Check for deboarding confirmation notification
+      const notifRes = await fetch(
+        '/api/notifications?role=TTE'
+      );
+
+      const notifData = await notifRes.json();
+
+      if (notifData.success) {
+        const confirmationNotification =
+          notifData.data?.find(
+            n =>
+              n.status === 'UNREAD' &&
+              n.type === 'DEBOARDING_VERIFICATION'
+          );
+
+        if (confirmationNotification) {
+          setSuccessMsg(
+            '🔔 Deboarding confirmation required. Train stopped.'
+          );
+
+          // Open notification tab
+          setActiveTab('notifications');
+
+          break;
+        }
+      }
+
+      // Wait 700ms before advancing again
+      await new Promise(resolve =>
+        setTimeout(resolve, 700)
+      );
+    }
+
+  } catch (error) {
+    console.error('Auto train advance failed:', error);
+  } finally {
+    setActionLoading(false);
   }
+}
 
   async function handleReset() {
     setResetLoading(true);
@@ -478,7 +1007,7 @@ export default function TTEPage() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <ViewToggle />
+            {/* <ViewToggle /> */}
             <button className="btn-ghost" style={{ fontSize: '11px', color: '#94a3b8', borderColor: '#334155' }} onClick={() => router.push('/search')}>
               Passenger App
             </button>
@@ -533,25 +1062,125 @@ export default function TTEPage() {
         )}
 
         {/* Tabs */}
-        <div style={{ borderBottom: '1px solid #334155', display: 'flex', gap: '0', padding: '0 16px' }}>
-          {[
-            { key: 'intents', label: 'Deboarding Intents', badge: passengers.length },
-            { key: 'train', label: 'Train Simulator' },
-            { key: 'notifications', label: 'Notifications', badge: unreadCount },
-            { key: 'allocations', label: 'Allocations', badge: allocations.length }
-          ].map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-              background: 'none', border: 'none', borderBottom: `3px solid ${activeTab === tab.key ? '#f97316' : 'transparent'}`,
-              color: activeTab === tab.key ? '#f97316' : '#64748b',
-              fontWeight: activeTab === tab.key ? '700' : '500',
-              padding: '10px 14px', cursor: 'pointer', fontSize: '12px',
-              display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.2s'
-            }}>
-              {tab.label}
-              {tab.badge > 0 && <NotifBadge count={tab.badge} />}
-            </button>
-          ))}
-        </div>
+      
+{/* Tabs */}
+<div
+  className="tte-tabs"
+  style={{
+    borderBottom: '1px solid #334155',
+    display: 'flex',
+    width: '100%',
+    padding: '0 16px',
+    boxSizing: 'border-box'
+  }}
+>
+  {[
+    {
+      key: 'intents',
+      label: 'Deboarding Intents',
+      mobileLabel: 'Intents',
+      badge: passengers.length
+    },
+    {
+      key: 'train',
+      label: 'Train Simulator',
+      mobileLabel: 'Train'
+    },
+    {
+      key: 'notifications',
+      label: 'Notifications',
+      mobileLabel: 'Notifications',
+      badge: unreadCount
+    },
+    {
+      key: 'allocations',
+      label: 'Allocations',
+      mobileLabel: 'Allocations',
+      badge: allocations.length
+    }
+  ].map(tab => (
+    <button
+      key={tab.key}
+      onClick={() => setActiveTab(tab.key)}
+      style={{
+        flex: '1 1 0',
+        minWidth: 0,
+        background: 'none',
+        border: 'none',
+        borderBottom: `3px solid ${
+          activeTab === tab.key
+            ? '#f97316'
+            : 'transparent'
+        }`,
+        color:
+          activeTab === tab.key
+            ? '#f97316'
+            : '#64748b',
+        fontWeight:
+          activeTab === tab.key
+            ? '700'
+            : '500',
+        padding: '10px 8px',
+        cursor: 'pointer',
+        fontSize: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px',
+        transition: 'color 0.2s',
+        whiteSpace: 'nowrap',
+        minHeight: '40px',
+        overflow: 'hidden'
+      }}
+    >
+      <span className="tab-label-desktop">
+        {tab.label}
+      </span>
+
+      <span className="tab-label-mobile">
+        {tab.mobileLabel}
+      </span>
+
+      {tab.badge > 0 && (
+        <NotifBadge count={tab.badge} />
+      )}
+    </button>
+  ))}
+</div>
+
+<style jsx>{`
+  .tab-label-mobile {
+    display: none;
+  }
+
+  @media (max-width: 700px) {
+    .tte-tabs {
+      padding: 0 6px !important;
+    }
+
+    .tte-tabs button {
+      padding: 10px 4px !important;
+      font-size: 11px !important;
+      gap: 3px !important;
+    }
+
+    .tab-label-desktop {
+      display: none;
+    }
+
+    .tab-label-mobile {
+      display: inline;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .tte-tabs button {
+      padding: 10px 2px !important;
+      font-size: 10px !important;
+    }
+  }
+`}</style>
+
 
         {/* Content */}
         <div style={{ padding: '16px', maxWidth: '900px', margin: '0 auto' }}>
@@ -598,15 +1227,7 @@ export default function TTEPage() {
 
           {activeTab === 'train' && (
             <div>
-              <TrainProgressSimulator
-                progress={progress}
-                train={train}
-                onAdvance={handleAdvance}
-                loading={actionLoading}
-              />
-
-              {/* Demo controls */}
-              <div className="tte-card" style={{ marginTop: '16px', border: '1px dashed #475569' }}>
+<div className="tte-card" style={{ marginTop: '16px', border: '1px dashed #475569' }}>
                 <div style={{ fontSize: '11px', color: '#f97316', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '12px' }}>
                   🛠️ PROTOTYPE DEMO CONTROLS
                 </div>
@@ -645,6 +1266,16 @@ export default function TTEPage() {
                   These controls are for prototype demonstration only and are not part of the production interface.
                 </div>
               </div>
+
+              <TrainProgressSimulator
+                progress={progress}
+                train={train}
+                onAdvance={handleAdvance}
+                loading={actionLoading}
+              />
+
+              {/* Demo controls */}
+              
             </div>
           )}
 

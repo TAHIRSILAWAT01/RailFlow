@@ -87,7 +87,7 @@ html, body {
 }
 
 .desktop-container {
-  max-width: 1280px;
+  /* max-width: 1280px; */
   margin: 0 auto;
   min-height: 100vh;
   background: var(--rf-bg);

@@ -2,23 +2,22 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
 
-const ViewContext = createContext({ view: 'desktop', setView: () => {} });
+const ViewContext = createContext({
+  view: 'desktop',
+  setView: () => {}
+});
 
 export function ViewProvider({ children }) {
   const [view, setView] = useState('desktop');
 
   useEffect(() => {
-    const saved = localStorage.getItem('rf_view');
-    if (saved) setView(saved);
-    else {
-      // Auto-detect from window width
-      setView(window.innerWidth < 768 ? 'mobile' : 'desktop');
-    }
+    setView('desktop');
+    localStorage.setItem('rf_view', 'desktop');
   }, []);
 
-  const handleSetView = (v) => {
-    setView(v);
-    localStorage.setItem('rf_view', v);
+  const handleSetView = (value) => {
+    setView(value);
+    localStorage.setItem('rf_view', value);
   };
 
   return (
@@ -44,6 +43,7 @@ export function ViewToggle() {
       >
         📱 Mobile
       </button>
+
       <button
         className={view === 'desktop' ? 'active' : ''}
         onClick={() => setView('desktop')}
@@ -60,7 +60,15 @@ export function AppShell({ children }) {
 
   if (view === 'mobile') {
     return (
-      <div style={{ background: '#e2e8f0', minHeight: '100vh', display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+      <div
+        style={{
+          background: '#e2e8f0',
+          minHeight: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '20px 0'
+        }}
+      >
         <div className="mobile-container fade-in">
           {children}
         </div>
