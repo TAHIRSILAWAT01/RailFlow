@@ -794,6 +794,7 @@ export default function TTEPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('intents');
   const [resetLoading, setResetLoading] = useState(false);
+  const [oneTime, setoneTime] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -820,6 +821,12 @@ export default function TTEPage() {
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  useEffect(() => {
+  if (activeTab === 'notifications') {
+    setoneTime(true);
+  }
+}, [activeTab]);
 
   async function handleConfirmIntent(passenger, isDeboarding = false) {
     setActionLoading(true);
@@ -945,7 +952,7 @@ export default function TTEPage() {
               n.type === 'DEBOARDING_VERIFICATION'
           );
 
-        if (confirmationNotification) {
+        if (confirmationNotification && !oneTime) {
           setSuccessMsg(
             '🔔 Deboarding confirmation required. Train stopped.'
           );

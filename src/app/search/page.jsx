@@ -38,22 +38,22 @@ function StationSelect({ value, onChange, stations, placeholder, label }) {
     <div style={{ position: 'relative' }}>
       <label className="rf-label">{label}</label>
       <div style={{ position: 'relative' }}>
-        <input
-          className="rf-input"
-          value={search}
-          placeholder={placeholder}
-          onChange={e => {
-            setSearch(e.target.value);
-            setOpen(true);
-            if (!e.target.value) {
-              setSelected(null);
-              onChange('');
-            }
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
-          autoComplete="off"
-        />
+       <input
+  className="rf-input"
+  value={search}
+  placeholder={placeholder}
+  onChange={e => {
+    setSearch(e.target.value);
+    setOpen(true);
+
+    if (!e.target.value) {
+      setSelected(null);
+      onChange('');
+    }
+  }}
+  onFocus={() => setOpen(true)}
+  autoComplete="off"
+/>
         {selected && (
           <span style={{
             position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
@@ -74,22 +74,33 @@ function StationSelect({ value, onChange, stations, placeholder, label }) {
         }}>
           {filtered.map(s => (
             <div
-              key={s.code}
-              onClick={() => {
-                setSelected(s);
-                setSearch(s.name);
-                onChange(s.code);
-                setOpen(false);
-              }}
-              style={{
-                padding: '10px 14px',
-                cursor: 'pointer',
-                borderBottom: '1px solid #f1f5f9',
-                transition: 'background 0.15s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
-              onMouseLeave={e => e.currentTarget.style.background = 'white'}
-            >
+  key={s.code}
+
+  onPointerDown={(e) => {
+    e.preventDefault();
+
+    setSelected(s);
+    setSearch(s.name);
+    onChange(s.code);
+    setOpen(false);
+  }}
+
+  style={{
+    padding: '10px 14px',
+    cursor: 'pointer',
+    borderBottom: '1px solid #f1f5f9',
+    transition: 'background 0.15s',
+    touchAction: 'manipulation'
+  }}
+
+  onMouseEnter={e =>
+    e.currentTarget.style.background = '#f8f9fa'
+  }
+
+  onMouseLeave={e =>
+    e.currentTarget.style.background = 'white'
+  }
+>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a202c' }}>{s.name}</div>
