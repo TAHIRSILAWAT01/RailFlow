@@ -206,7 +206,16 @@ export default function SearchPage() {
       <AppShell>
         <Header title="Search Trains" showBack={false} />
 
-        <div style={{ width: '100%',maxWidth: '1400px',margin: '0 auto', padding: '32px clamp(20px, 3vw, 48px)',boxSizing: 'border-box'}}>
+       <div style={{
+  minHeight: '100vh',
+  width: '100%',
+  backgroundImage: "linear-gradient(rgba(255,255,255,.72), rgba(255,255,255,.72)), url('/bg.jpeg')",
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  backgroundAttachment: 'fixed',
+  padding: '32px clamp(20px, 3vw, 48px)',
+  boxSizing: 'border-box'
+}}>
           {/* Hero */}
           <div style={{ marginBottom: '24px' }}>
             <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1a3a5c', lineHeight: 1.2, marginBottom: '4px' }}>
