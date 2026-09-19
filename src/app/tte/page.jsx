@@ -1280,62 +1280,117 @@ export default function TTEPage() {
   }, [activeTab]);
 
   async function handleConfirmIntent(passenger, isDeboarding = false) {
-    setActionLoading(true);
-    setErrorMsg("");
-    try {
-      if (isDeboarding) {
-        // DEBOARDING_DUE: verify actual deboarding
-        const vacancy = passenger.vacancy;
-        if (!vacancy) {
-          setErrorMsg("No vacancy found for this passenger");
-          return;
-        }
-        const res = await fetch(
-          `/api/vacancies/${vacancy.id}/verify-deboarding`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tteId: "TTE-001",
-              passengerDeboarded: true,
-            }),
-          },
-        );
-        const data = await res.json();
-        if (data.success) {
-          setSuccessMsg(
-            `✅ Passenger deboarded. Vacancy verified. ${data.data.recommendation ? "Allocation recommendation created." : ""}`,
-          );
-        } else setErrorMsg(data.error);
-      } else {
-        // Confirm early deboarding intent
-        const intent = passenger.intent;
-        if (!intent) {
-          setErrorMsg("No intent found");
-          return;
-        }
-        const res = await fetch(
-          `/api/deboarding-intents/${intent.id}/tte-confirm`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tteId: "TTE-001" }),
-          },
-        );
-        const data = await res.json();
-        if (data.success) {
-          setSuccessMsg(
-            "🔒 Early deboarding confirmed and locked. Passenger cannot modify.",
-          );
-        } else setErrorMsg(data.error);
+  setActionLoading(true);
+  setErrorMsg("");
+
+  try {
+    if (isDeboarding) {
+      // DEBOARDING_DUE: verify actual deboarding
+      const vacancy = passenger.vacancy;
+
+      if (!vacancy) {
+        setErrorMsg("No vacancy found for this passenger");
+        return;
       }
-      await loadAll();
-    } catch {
-      setErrorMsg("Action failed. Please try again.");
-    } finally {
-      setActionLoading(false);
+
+      const res = await fetch(
+        `/api/vacancies/${vacancy.id}/verify-deboarding`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tteId: "TTE-001",
+            passengerDeboarded: true,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSuccessMsg(
+          `✅ Passenger deboarded. Vacancy verified. ${
+            data.data.recommendation
+              ? "Allocation recommendation created."
+              : ""
+          }`,
+        );
+
+        // Mark the station-reached notification as handled
+        // so the train can resume.
+        const relatedNotification = notifications.find(
+          (n) =>
+            n.bookingId === passenger.bookingId &&
+            n.type === "DEBOARDING_VERIFICATION" &&
+            n.status === "UNREAD",
+        );
+
+        if (relatedNotification) {
+          await fetch(
+            `/api/notifications/${relatedNotification.id}/read`,
+            {
+              method: "POST",
+            },
+          );
+
+          setNotifications((current) =>
+            current.map((n) =>
+              n.id === relatedNotification.id
+                ? { ...n, status: "READ" }
+                : n,
+            ),
+          );
+        }
+
+        // Refresh TTE data
+        await loadAll();
+
+        // Automatically resume the train
+        await handleAdvance();
+      } else {
+        setErrorMsg(data.error);
+      }
+
+      return;
     }
+
+    // Confirm early deboarding intent
+    const intent = passenger.intent;
+
+    if (!intent) {
+      setErrorMsg("No intent found");
+      return;
+    }
+
+    const res = await fetch(
+      `/api/deboarding-intents/${intent.id}/tte-confirm`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tteId: "TTE-001",
+        }),
+      },
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      setSuccessMsg(
+        "🔒 Early deboarding confirmed and locked. Passenger cannot modify.",
+      );
+    } else {
+      setErrorMsg(data.error);
+    }
+
+    await loadAll();
+  } catch (error) {
+    console.error("TTE action failed:", error);
+    setErrorMsg("Action failed. Please try again.");
+  } finally {
+    setActionLoading(false);
   }
+}
 
   async function handleContinue(passenger, isDeboarding = false) {
     setActionLoading(true);
@@ -1417,33 +1472,29 @@ export default function TTEPage() {
           break;
         }
 
-        // Check for deboarding confirmation notification
-        const notifRes = await fetch("/api/notifications?role=TTE");
+        // Check for deboarding confirmation notification.
+// The train should stop here, but the TTE should NOT
+// be automatically redirected to the Notifications tab.
+const notifRes = await fetch("/api/notifications?role=TTE");
+const notifData = await notifRes.json();
 
-        const notifData = await notifRes.json();
+if (notifData.success) {
+  const confirmationNotification = notifData.data?.find(
+    (n) =>
+      n.status === "UNREAD" &&
+      n.type === "DEBOARDING_VERIFICATION",
+  );
 
-        if (notifData.success) {
-          const confirmationNotification = notifData.data?.find(
-            (n) =>
-              n.status === "UNREAD" && n.type === "DEBOARDING_VERIFICATION",
-          );
+  if (confirmationNotification) {
+    setSuccessMsg(
+      "🔔 Deboarding station reached. Verification notification received.",
+    );
 
-          if (
-            confirmationNotification &&
-            !oneTime &&
-            lastActiveTab.current !== "notifications"
-          ) {
-            setSuccessMsg(
-              "🔔 Deboarding confirmation required. Train stopped.",
-            );
-
-            // Open notification tab
-            setActiveTab("notifications");
-
-            break;
-          }
-        }
-
+    // Stop the simulator at the deboarding station.
+    // TTE remains on the current tab.
+    break;
+  }
+}
         // Wait 700ms before advancing again
         await new Promise((resolve) => setTimeout(resolve, 700));
       }
@@ -1483,6 +1534,47 @@ export default function TTEPage() {
       setResetLoading(false);
     }
   }
+ async function handleRefreshTrain() {
+  setResetLoading(true);
+  setErrorMsg("");
+
+  try {
+    const res = await fetch("/api/train-progress", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        trainId: TRAIN_ID,
+        action: "reset",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      setErrorMsg(data.error || "Unable to reset train position.");
+      return;
+    }
+
+    setProgress(data.data);
+
+    setSuccessMsg(
+      `🚆 Train returned to ${data.data.currentStation}.`,
+    );
+
+    await loadAll();
+
+    setTimeout(() => {
+      setSuccessMsg("");
+    }, 3000);
+  } catch (error) {
+    console.error("Train position reset failed:", error);
+    setErrorMsg("Unable to return train to starting station.");
+  } finally {
+    setResetLoading(false);
+  }
+}
 
   async function markNotifRead(id) {
     await fetch(`/api/notifications/${id}/read`, {
@@ -1518,18 +1610,25 @@ export default function TTEPage() {
       })),
     );
   }
-
-  const unreadCount = notifications.filter((n) => n.status === "UNREAD").length;
+const unreadCount = notifications.filter(
+  (n) => n.status === "UNREAD"
+).length;
   const pendingPassengers = passengers.filter((p) => {
   const status = p.intent?.status;
 
-  // Passenger already chose to continue → no pending action
+  // Passenger chose to continue → remove from deboarding intent list
   if (continuedPassengers[p.bookingId]) {
     return false;
   }
 
-  // Only these statuses require TTE action
-  return status === "DECLARED" || status === "DEBOARDING_DUE";
+  // Keep the passenger visible throughout the early-deboarding workflow:
+  // DECLARED → TTE_CONFIRMED/LOCKED → DEBOARDING_DUE
+  return (
+    status === "DECLARED" ||
+    status === "TTE_CONFIRMED" ||
+    status === "LOCKED" ||
+    status === "DEBOARDING_DUE"
+  );
 });
   const urgentNotifs = notifications.filter(
     (n) =>
@@ -1997,7 +2096,8 @@ export default function TTEPage() {
                     ⏭ Advance Train Station
                   </button>
                   <button
-                    onClick={loadAll}
+                    onClick={handleRefreshTrain}
+                    disabled={resetLoading}
                     style={{
                       background: "#0f172a",
                       border: "1px solid #334155",
