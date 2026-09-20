@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStore } from '@/lib/store';
+import { initializeStore } from '@/lib/store';
 
 export async function GET(request) {
   try {
@@ -7,24 +7,46 @@ export async function GET(request) {
     const role = searchParams.get('role');
     const unread = searchParams.get('unread');
 
-    const store = getStore();
-    let notifs = [...store.notifications].sort((a, b) =>
-      new Date(b.createdAt) - new Date(a.createdAt)
+    // Load latest persistent RailFlow state
+    const store = await initializeStore();
+
+    let notifs = [...store.notifications].sort(
+      (a, b) =>
+        new Date(b.createdAt) -
+        new Date(a.createdAt)
     );
 
     if (role) {
-      notifs = notifs.filter(n => n.recipientRole === role || n.recipientRole === 'ALL');
+      notifs = notifs.filter(
+        n =>
+          n.recipientRole === role ||
+          n.recipientRole === 'ALL'
+      );
     }
+
     if (unread === 'true') {
-      notifs = notifs.filter(n => n.status === 'UNREAD');
+      notifs = notifs.filter(
+        n => n.status === 'UNREAD'
+      );
     }
 
     return NextResponse.json({
       success: true,
       data: notifs,
-      unreadCount: notifs.filter(n => n.status === 'UNREAD').length
+      unreadCount: notifs.filter(
+        n => n.status === 'UNREAD'
+      ).length
     });
+
   } catch (err) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error('Notifications error:', err);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: err.message
+      },
+      { status: 500 }
+    );
   }
 }

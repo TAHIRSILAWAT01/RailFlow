@@ -4,26 +4,57 @@ import {
   getAllProgress,
   resetProgress
 } from '@/lib/trainProgressService';
+import {
+  initializeStore,
+  persistStore
+} from '@/lib/store';
 
 export async function GET(request) {
   try {
+    // Load latest persistent state
+    await initializeStore();
+
     const { searchParams } = new URL(request.url);
     const trainId = searchParams.get('trainId');
 
     if (trainId) {
       const progress = getProgress(trainId);
+
       if (!progress) {
-        return NextResponse.json({ success: false, error: 'Train not found' }, { status: 404 });
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Train not found'
+          },
+          { status: 404 }
+        );
       }
-      return NextResponse.json({ success: true, data: progress });
+
+      return NextResponse.json({
+        success: true,
+        data: progress
+      });
     }
 
     const all = getAllProgress();
-    return NextResponse.json({ success: true, data: all });
+
+    return NextResponse.json({
+      success: true,
+      data: all
+    });
   } catch (err) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error('Get train progress error:', err);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: err.message
+      },
+      { status: 500 }
+    );
   }
 }
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -49,6 +80,10 @@ export async function POST(request) {
       );
     }
 
+    // Load latest persistent state
+    await initializeStore();
+
+    // Reset train progress
     const progress = resetProgress(trainId);
 
     if (!progress) {
@@ -61,12 +96,17 @@ export async function POST(request) {
       );
     }
 
+    // Persist reset state
+    await persistStore();
+
     return NextResponse.json({
       success: true,
       data: progress
     });
 
   } catch (err) {
+    console.error('Reset train progress error:', err);
+
     return NextResponse.json(
       {
         success: false,

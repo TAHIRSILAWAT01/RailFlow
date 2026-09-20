@@ -1,5 +1,11 @@
-// RailFlow in-memory store with persistence via module singleton
-// In production this would be a proper database
+// RailFlow state store
+// In-memory cache + Supabase persistence
+
+const {
+  loadPersistedState,
+  savePersistedState,
+  clearPersistedState,
+} = require('./storePersistence');
 
 let store = null;
 
@@ -438,13 +444,68 @@ function getStore() {
     store = getInitialStore();
     seedDemoData(store);
   }
+
   return store;
 }
 
-function resetStore() {
+/**
+ * Load state from Supabase.
+ *
+ * IMPORTANT:
+ * Existing application services can continue using
+ * synchronous getStore() after this function has completed.
+ */
+async function initializeStore() {
+  if (store) {
+    return store;
+  }
+
+  const persistedState = await loadPersistedState();
+
+  if (persistedState) {
+    store = persistedState;
+    return store;
+  }
+
+  // First application startup:
+  // create the existing demo state and persist it.
   store = getInitialStore();
   seedDemoData(store);
+
+  await savePersistedState(store);
+
   return store;
 }
 
-module.exports = { getStore, resetStore };
+/**
+ * Persist the current in-memory state to Supabase.
+ */
+async function persistStore() {
+  if (!store) {
+    store = getInitialStore();
+    seedDemoData(store);
+  }
+
+  await savePersistedState(store);
+
+  return store;
+}
+
+/**
+ * Reset both memory and persistent database state.
+ */
+async function resetStore() {
+  store = getInitialStore();
+  seedDemoData(store);
+
+  await savePersistedState(store);
+
+  return store;
+}
+
+module.exports = {
+  getStore,
+  initializeStore,
+  persistStore,
+  resetStore,
+};
