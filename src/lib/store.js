@@ -456,10 +456,6 @@ function getStore() {
  * synchronous getStore() after this function has completed.
  */
 async function initializeStore() {
-  if (store) {
-    return store;
-  }
-
   const persistedState = await loadPersistedState();
 
   if (persistedState) {
@@ -467,11 +463,8 @@ async function initializeStore() {
     return store;
   }
 
-  // First application startup:
-  // create the existing demo state and persist it.
   store = getInitialStore();
   seedDemoData(store);
-
   await savePersistedState(store);
 
   return store;
