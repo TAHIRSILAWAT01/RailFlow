@@ -524,7 +524,14 @@ function AllocationCard({ allocation }) {
   const candidate = allocation.recommendedCandidate;
 
   return (
-    <div className="tte-card" style={{ border: "2px solid #22c55e" }}>
+    <div
+  className="tte-card"
+  style={{
+    border: "2px solid #22c55e",
+    width: "100%",
+    boxSizing: "border-box",
+  }}
+>
       <div
         style={{
           fontSize: "10px",
@@ -2275,26 +2282,37 @@ const unreadCount = notifications.filter(
               >
                 Allocation Recommendations
               </div>
-              {allocations.length === 0 && (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "40px",
-                    color: "#64748b",
-                  }}
-                >
-                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>
-                    📋
-                  </div>
-                  <div>No allocation recommendations yet.</div>
-                  <div style={{ fontSize: "12px", marginTop: "8px" }}>
-                    Verify a passenger deboarding to generate recommendations.
-                  </div>
-                </div>
-              )}
-              {allocations.map((a) => (
-                <AllocationCard key={a.id} allocation={a} />
-              ))}
+             {allocations.length === 0 ? (
+  <div
+    style={{
+      textAlign: "center",
+      padding: "40px",
+      color: "#64748b",
+    }}
+  >
+    <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+    <div>No allocation recommendations yet.</div>
+    <div style={{ fontSize: "12px", marginTop: "8px" }}>
+      Verify a passenger deboarding to generate recommendations.
+    </div>
+  </div>
+) : (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px",
+      width: "100%",
+    }}
+  >
+    {allocations.map((allocation) => (
+      <AllocationCard
+        key={allocation.id}
+        allocation={allocation}
+      />
+    ))}
+  </div>
+)}
 
               {allocations.length > 0 && (
                 <div

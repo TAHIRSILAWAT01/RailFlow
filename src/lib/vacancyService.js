@@ -101,10 +101,27 @@ function verifyDeboarding(vacancyId, tteId, passengerDeboarded) {
 
 function generateAllocationRecommendation(vacancyId) {
   const store = getStore();
-  const vacancy = store.vacancies.find(v => v.id === vacancyId);
-  if (!vacancy || vacancy.status !== VACANCY_STATES.VERIFIED_VACANCY) return null;
 
-  // Find matching RAC candidates first, then WL
+  const vacancy = store.vacancies.find(v => v.id === vacancyId);
+
+  if (!vacancy) {
+    throw new Error('Vacancy not found');
+  }
+
+  if (vacancy.status !== VACANCY_STATES.VERIFIED_VACANCY) {
+    return null;
+  }
+
+  // Prevent duplicate recommendation for the SAME vacancy
+  const existingAllocation = store.allocations.find(
+    a => a.vacancyId === vacancyId
+  );
+
+  if (existingAllocation) {
+    return existingAllocation;
+  }
+
+  // Find candidates matching this exact vacancy
   const racCandidates = store.racCandidates.filter(c =>
     c.trainId === vacancy.trainId &&
     c.fromStation === vacancy.fromStation &&
@@ -123,35 +140,70 @@ function generateAllocationRecommendation(vacancyId) {
 
   const allCandidates = [...racCandidates, ...wlCandidates];
 
+  // No eligible downstream passenger
   if (allCandidates.length === 0) {
-    // No matching candidates
     return null;
   }
 
-  const topCandidate = allCandidates[0];
+  /*
+   * IMPORTANT:
+   * Do not use a candidate that has already been recommended
+   * for another vacancy.
+   */
+  const alreadyRecommendedCandidateIds = new Set(
+    store.allocations
+      .map(a => a.recommendedCandidate?.id)
+      .filter(Boolean)
+  );
+
+  const availableCandidates = allCandidates.filter(
+    candidate => !alreadyRecommendedCandidateIds.has(candidate.id)
+  );
+
+  if (availableCandidates.length === 0) {
+    return null;
+  }
+
+  // RAC gets priority because RAC candidates are already first
+  // in the combined list.
+  const topCandidate = availableCandidates[0];
 
   const allocation = {
     id: generateId('ALLOC'),
-    vacancyId,
+    vacancyId: vacancy.id,
+    bookingId: vacancy.bookingId,
     trainId: vacancy.trainId,
+    trainNumber: vacancy.trainNumber,
     coach: vacancy.coach,
     berth: vacancy.berth,
     class: vacancy.class,
     fromStation: vacancy.fromStation,
     toStation: vacancy.toStation,
+
     recommendedCandidate: topCandidate,
-    allCandidates: allCandidates.slice(0, 5),
+
+    allCandidates: availableCandidates.slice(0, 5),
+
     status: 'RECOMMENDED',
-    reasoning: topCandidate.type === 'RAC'
-      ? `RAC passenger ${topCandidate.name} (${topCandidate.pnr}) has priority. Same train, segment, and class.`
-      : `WL passenger ${topCandidate.name} (${topCandidate.pnr}) is next in queue. Same train, segment, and class.`,
-    disclaimer: 'Recommendation only — final allocation follows Railway rules and authorized PRS/HHT workflow.',
+
+    reasoning:
+      topCandidate.type === 'RAC'
+        ? `RAC passenger ${topCandidate.name} (${topCandidate.pnr}) has priority. Same train, segment, and class.`
+        : `WL passenger ${topCandidate.name} (${topCandidate.pnr}) is next in queue. Same train, segment, and class.`,
+
+    disclaimer:
+      'Recommendation only — final allocation follows Railway rules and authorized PRS/HHT workflow.',
+
     createdAt: new Date().toISOString()
   };
 
+  // Add a NEW allocation record.
   store.allocations.push(allocation);
 
-  // Update vacancy status
+  // Mark candidate as reserved for this prototype.
+  topCandidate.status = 'RECOMMENDED';
+
+  // Update vacancy state.
   vacancy.status = VACANCY_STATES.ALLOCATION_RECOMMENDED;
   vacancy.updatedAt = new Date().toISOString();
 
@@ -161,7 +213,10 @@ function generateAllocationRecommendation(vacancyId) {
     vacancyId: vacancy.id,
     recipientRole: 'TTE',
     title: '📋 Allocation Recommendation',
-    message: `${topCandidate.type} candidate ${topCandidate.name} recommended for berth ${vacancy.coach}-${vacancy.berth} (${vacancy.fromStation} → ${vacancy.toStation}).`
+    message:
+      `${topCandidate.type} candidate ${topCandidate.name} recommended ` +
+      `for berth ${vacancy.coach}-${vacancy.berth} ` +
+      `(${vacancy.fromStation} → ${vacancy.toStation}).`
   });
 
   return allocation;
