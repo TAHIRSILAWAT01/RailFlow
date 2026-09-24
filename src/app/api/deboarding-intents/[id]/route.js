@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { updateIntent } from '@/lib/intentService';
 import { initializeStore, persistStore } from '@/lib/store';
 
@@ -6,33 +8,37 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params;
 
-    // Load latest persistent state
-    const store = await initializeStore();
+    // Load latest persistent state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    const intent = store.deboardingIntents.find(
-      i => i.id === id
-    );
+    return await runWithSessionStore(sessionId, async () => {
+      const store = await initializeStore(sessionId);
 
-    if (!intent) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Intent not found'
-        },
-        { status: 404 }
+      const intent = store.deboardingIntents.find(
+        i => i.id === id
       );
-    }
 
-    const vacancy = store.vacancies.find(
-      v => v.intentId === id
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        intent,
-        vacancy
+      if (!intent) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Intent not found'
+          },
+          { status: 404 }
+        );
       }
+
+      const vacancy = store.vacancies.find(
+        v => v.intentId === id
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          intent,
+          vacancy
+        }
+      });
     });
   } catch (err) {
     console.error('Get intent error:', err);
@@ -77,24 +83,28 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    // Load latest persistent state
-    await initializeStore();
+    // Load latest persistent state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    // Update intent + linked vacancy
-    const intent = updateIntent(
-      id,
-      deboardingStation,
-      bookingId
-    );
+    return await runWithSessionStore(sessionId, async () => {
+      await initializeStore(sessionId);
 
-    // Persist changes to Supabase
-    await persistStore();
+      // Update intent + linked vacancy
+      const intent = updateIntent(
+        id,
+        deboardingStation,
+        bookingId
+      );
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        intent
-      }
+      // Persist changes to Supabase
+      await persistStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          intent
+        }
+      });
     });
   } catch (err) {
     console.error('Update intent error:', err);

@@ -22,13 +22,21 @@ const supabase = createClient(
   }
 );
 
-const STATE_ID = 'railflow-main';
+function getStateId(sessionId) {
+  if (!sessionId) {
+    throw new Error('Session ID is required');
+  }
 
-async function loadPersistedState() {
+  return `railflow-session-${sessionId}`;
+}
+
+async function loadPersistedState(sessionId) {
+  const stateId = getStateId(sessionId);
+
   const { data, error } = await supabase
     .from('railflow_state')
     .select('state')
-    .eq('id', STATE_ID)
+    .eq('id', stateId)
     .maybeSingle();
 
   if (error) {
@@ -38,12 +46,14 @@ async function loadPersistedState() {
   return data?.state || null;
 }
 
-async function savePersistedState(state) {
+async function savePersistedState(sessionId, state) {
+  const stateId = getStateId(sessionId);
+
   const { data, error } = await supabase
     .from('railflow_state')
     .upsert(
       {
-        id: STATE_ID,
+        id: stateId,
         state,
         updated_at: new Date().toISOString(),
       },
@@ -61,11 +71,13 @@ async function savePersistedState(state) {
   return data;
 }
 
-async function clearPersistedState() {
+async function clearPersistedState(sessionId) {
+  const stateId = getStateId(sessionId);
+
   const { error } = await supabase
     .from('railflow_state')
     .delete()
-    .eq('id', STATE_ID);
+    .eq('id', stateId);
 
   if (error) {
     throw new Error(`Failed to clear RailFlow state: ${error.message}`);

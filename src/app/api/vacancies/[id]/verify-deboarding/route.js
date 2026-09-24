@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { verifyDeboarding } from '@/lib/vacancyService';
 import { initializeStore, persistStore } from '@/lib/store';
 
@@ -18,38 +20,42 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Load latest persistent RailFlow state
-    await initializeStore();
+    // Load latest persistent RailFlow state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    // Verify whether passenger actually deboarded
-    //
-    // If true:
-    //   vacancy → VERIFIED_VACANCY
-    //   intent → VERIFIED
-    //   verification → created
-    //   allocation recommendation → generated
-    //
-    // If false:
-    //   vacancy → REJECTED
-    //   intent → PASSENGER_CONTINUED
-    const result = verifyDeboarding(
-      id,
-      tteId,
-      passengerDeboarded
-    );
+    return await runWithSessionStore(sessionId, async () => {
+      await initializeStore(sessionId);
 
-    // Persist all changes:
-    // vacancy + intent + verification + allocation + notification
-    await persistStore();
+      // Verify whether passenger actually deboarded
+      //
+      // If true:
+      //   vacancy → VERIFIED_VACANCY
+      //   intent → VERIFIED
+      //   verification → created
+      //   allocation recommendation → generated
+      //
+      // If false:
+      //   vacancy → REJECTED
+      //   intent → PASSENGER_CONTINUED
+      const result = verifyDeboarding(
+        id,
+        tteId,
+        passengerDeboarded
+      );
 
-    return NextResponse.json({
-      success: true,
-      data: result,
-      message: passengerDeboarded
-        ? 'Verified vacancy created. Allocation recommendation generated.'
-        : 'Passenger continued. No vacancy created.',
-      disclaimer:
-        'Recommendation only — final allocation follows Railway rules.'
+      // Persist all changes:
+      // vacancy + intent + verification + allocation + notification
+      await persistStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: result,
+        message: passengerDeboarded
+          ? 'Verified vacancy created. Allocation recommendation generated.'
+          : 'Passenger continued. No vacancy created.',
+        disclaimer:
+          'Recommendation only — final allocation follows Railway rules.'
+      });
     });
   } catch (err) {
     console.error('Verify deboarding error:', err);

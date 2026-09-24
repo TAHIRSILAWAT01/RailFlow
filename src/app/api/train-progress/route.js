@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import {
   getProgress,
   getAllProgress,
@@ -11,36 +13,40 @@ import {
 
 export async function GET(request) {
   try {
-    // Load latest persistent state
-    await initializeStore();
+    // Load latest persistent state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    const { searchParams } = new URL(request.url);
-    const trainId = searchParams.get('trainId');
+    return await runWithSessionStore(sessionId, async () => {
+      await initializeStore(sessionId);
 
-    if (trainId) {
-      const progress = getProgress(trainId);
+      const { searchParams } = new URL(request.url);
+      const trainId = searchParams.get('trainId');
 
-      if (!progress) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Train not found'
-          },
-          { status: 404 }
-        );
+      if (trainId) {
+        const progress = getProgress(trainId);
+
+        if (!progress) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Train not found'
+            },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: progress
+        });
       }
+
+      const all = getAllProgress();
 
       return NextResponse.json({
         success: true,
-        data: progress
+        data: all
       });
-    }
-
-    const all = getAllProgress();
-
-    return NextResponse.json({
-      success: true,
-      data: all
     });
   } catch (err) {
     console.error('Get train progress error:', err);
@@ -80,28 +86,32 @@ export async function POST(request) {
       );
     }
 
-    // Load latest persistent state
-    await initializeStore();
+    // Load latest persistent state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    // Reset train progress
-    const progress = resetProgress(trainId);
+    return await runWithSessionStore(sessionId, async () => {
+      await initializeStore(sessionId);
 
-    if (!progress) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Train not found'
-        },
-        { status: 404 }
-      );
-    }
+      // Reset train progress
+      const progress = resetProgress(trainId);
 
-    // Persist reset state
-    await persistStore();
+      if (!progress) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Train not found'
+          },
+          { status: 404 }
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      data: progress
+      // Persist reset state for this browser session
+      await persistStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: progress
+      });
     });
 
   } catch (err) {

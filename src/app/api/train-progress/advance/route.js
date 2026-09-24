@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { advanceStation } from '@/lib/trainProgressService';
 import { initializeStore, persistStore } from '@/lib/store';
 
@@ -17,24 +19,28 @@ export async function POST(request) {
       );
     }
 
-    // Load latest persistent RailFlow state
-    await initializeStore();
+    // Load latest persistent RailFlow state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    // Advance train by one station
-    //
-    // This can also:
-    // - update trainProgress
-    // - change locked intents to DEBOARDING_DUE
-    // - update vacancies
-    // - create TTE notifications
-    const progress = advanceStation(trainId);
+    return await runWithSessionStore(sessionId, async () => {
+      await initializeStore(sessionId);
 
-    // Persist ALL changes made by advanceStation()
-    await persistStore();
+      // Advance train by one station
+      //
+      // This can also:
+      // - update trainProgress
+      // - change locked intents to DEBOARDING_DUE
+      // - update vacancies
+      // - create TTE notifications
+      const progress = advanceStation(trainId);
 
-    return NextResponse.json({
-      success: true,
-      data: progress
+      // Persist ALL changes made by advanceStation()
+      await persistStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: progress
+      });
     });
   } catch (err) {
     console.error('Advance train progress error:', err);

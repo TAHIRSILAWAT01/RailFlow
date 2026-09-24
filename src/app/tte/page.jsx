@@ -2116,7 +2116,7 @@ const unreadCount = notifications.filter(
                       fontWeight: "600",
                     }}
                   >
-                    🔃 Refresh Data
+                    🔃 Reset Train
                   </button>
                 </div>
                 <div

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { initializeStore } from '@/lib/store';
 
 export async function GET(request) {
@@ -7,35 +9,39 @@ export async function GET(request) {
     const role = searchParams.get('role');
     const unread = searchParams.get('unread');
 
-    // Load latest persistent RailFlow state
-    const store = await initializeStore();
+    // Load latest persistent RailFlow state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    let notifs = [...store.notifications].sort(
-      (a, b) =>
-        new Date(b.createdAt) -
-        new Date(a.createdAt)
-    );
+    return await runWithSessionStore(sessionId, async () => {
+      const store = await initializeStore(sessionId);
 
-    if (role) {
-      notifs = notifs.filter(
-        n =>
-          n.recipientRole === role ||
-          n.recipientRole === 'ALL'
+      let notifs = [...store.notifications].sort(
+        (a, b) =>
+          new Date(b.createdAt) -
+          new Date(a.createdAt)
       );
-    }
 
-    if (unread === 'true') {
-      notifs = notifs.filter(
-        n => n.status === 'UNREAD'
-      );
-    }
+      if (role) {
+        notifs = notifs.filter(
+          n =>
+            n.recipientRole === role ||
+            n.recipientRole === 'ALL'
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      data: notifs,
-      unreadCount: notifs.filter(
-        n => n.status === 'UNREAD'
-      ).length
+      if (unread === 'true') {
+        notifs = notifs.filter(
+          n => n.status === 'UNREAD'
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: notifs,
+        unreadCount: notifs.filter(
+          n => n.status === 'UNREAD'
+        ).length
+      });
     });
 
   } catch (err) {

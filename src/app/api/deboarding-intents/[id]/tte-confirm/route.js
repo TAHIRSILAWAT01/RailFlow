@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { tteConfirmIntent } from '@/lib/intentService';
 import { initializeStore, persistStore } from '@/lib/store';
 
@@ -8,23 +10,27 @@ export async function POST(request, { params }) {
     const body = await request.json().catch(() => ({}));
     const { tteId } = body;
 
-    // Load the latest persistent RailFlow state
-    await initializeStore();
+    // Load the latest persistent RailFlow state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    // Confirm and lock the deboarding intent
-    const intent = tteConfirmIntent(id, tteId);
+    return await runWithSessionStore(sessionId, async () => {
+      await initializeStore(sessionId);
 
-    // Persist:
-    // - intent status
-    // - vacancy status
-    // - notification created by tteConfirmIntent()
-    await persistStore();
+      // Confirm and lock the deboarding intent
+      const intent = tteConfirmIntent(id, tteId);
 
-    return NextResponse.json({
-      success: true,
-      data: { intent },
-      message:
-        'Intent confirmed and locked. Passenger cannot modify deboarding station.'
+      // Persist:
+      // - intent status
+      // - vacancy status
+      // - notification created by tteConfirmIntent()
+      await persistStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: { intent },
+        message:
+          'Intent confirmed and locked. Passenger cannot modify deboarding station.'
+      });
     });
   } catch (err) {
     console.error('TTE intent confirmation error:', err);

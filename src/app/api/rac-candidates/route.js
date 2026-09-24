@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getStore } from '@/lib/store';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
+import { initializeStore } from '@/lib/store';
 
 export async function GET(request) {
   try {
@@ -9,16 +11,52 @@ export async function GET(request) {
     const toStation = searchParams.get('toStation');
     const cls = searchParams.get('class');
 
-    const store = getStore();
-    let candidates = [...store.racCandidates, ...store.waitlistCandidates];
+    const sessionId = await getOrCreateSessionId();
 
-    if (trainId) candidates = candidates.filter(c => c.trainId === trainId);
-    if (fromStation) candidates = candidates.filter(c => c.fromStation === fromStation);
-    if (toStation) candidates = candidates.filter(c => c.toStation === toStation);
-    if (cls) candidates = candidates.filter(c => c.class === cls);
+    return await runWithSessionStore(sessionId, async () => {
+      const store = await initializeStore(sessionId);
 
-    return NextResponse.json({ success: true, data: candidates });
+      let candidates = [
+        ...store.racCandidates,
+        ...store.waitlistCandidates
+      ];
+
+      if (trainId) {
+        candidates = candidates.filter(
+          c => c.trainId === trainId
+        );
+      }
+
+      if (fromStation) {
+        candidates = candidates.filter(
+          c => c.fromStation === fromStation
+        );
+      }
+
+      if (toStation) {
+        candidates = candidates.filter(
+          c => c.toStation === toStation
+        );
+      }
+
+      if (cls) {
+        candidates = candidates.filter(
+          c => c.class === cls
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: candidates
+      });
+    });
   } catch (err) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: err.message
+      },
+      { status: 500 }
+    );
   }
 }

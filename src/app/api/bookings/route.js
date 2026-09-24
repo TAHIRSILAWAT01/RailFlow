@@ -1,4 +1,6 @@
+import { getOrCreateSessionId } from '@/lib/session';
 import { NextResponse } from 'next/server';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { createBooking } from '@/lib/bookingService';
 import { createDeboardingIntent } from '@/lib/intentService';
 import { initializeStore, persistStore } from '@/lib/store';
@@ -99,121 +101,126 @@ export async function POST(request) {
       );
     }
 
-    // Load persistent RailFlow state
-    const store = await initializeStore();
+    // Get this browser's session
+    const sessionId = await getOrCreateSessionId();
 
-    const train = store.trains.find(
-      t => t.id === trainId
-    );
+    // Run all store/service operations inside this session context
+    return await runWithSessionStore(sessionId, async () => {
+      // Load persistent RailFlow state for this browser session
+      const store = await initializeStore(sessionId);
 
-    if (!train) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Train not found'
-        },
-        { status: 404 }
+      const train = store.trains.find(
+        t => t.id === trainId
       );
-    }
 
-    // Validate origin and destination
-    const originIdx = train.route.indexOf(origin);
-    const destIdx = train.route.indexOf(destination);
-
-    if (originIdx === -1) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Origin not on train route'
-        },
-        { status: 400 }
-      );
-    }
-
-    if (destIdx === -1) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Destination not on train route'
-        },
-        { status: 400 }
-      );
-    }
-
-    if (originIdx >= destIdx) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Destination must be after origin on route'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Create booking
-    const booking = createBooking({
-      trainId,
-      origin,
-      destination,
-      cls,
-      date,
-      passenger,
-      berthPreference,
-      fare: fare || 0
-    });
-
-    // Create early-deboarding intent if declared
-    let intent = null;
-    let vacancy = null;
-
-    if (
-      earlyDeboarding?.enabled &&
-      earlyDeboarding?.station
-    ) {
-      try {
-        intent = createDeboardingIntent(
-          booking.id,
-          earlyDeboarding.station
-        );
-
-        vacancy = store.vacancies.find(
-          v => v.bookingId === booking.id
-        );
-      } catch (intentErr) {
-        // Rollback in-memory booking
-        store.bookings = store.bookings.filter(
-          b => b.id !== booking.id
-        );
-
-        // Persist rollback
-        await persistStore();
-
+      if (!train) {
         return NextResponse.json(
           {
             success: false,
-            error: `Intent error: ${intentErr.message}`
+            error: 'Train not found'
+          },
+          { status: 404 }
+        );
+      }
+
+      // Validate origin and destination
+      const originIdx = train.route.indexOf(origin);
+      const destIdx = train.route.indexOf(destination);
+
+      if (originIdx === -1) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Origin not on train route'
           },
           { status: 400 }
         );
       }
-    }
 
-    // IMPORTANT:
-    // Persist booking + intent + vacancy to Supabase
-    await persistStore();
+      if (destIdx === -1) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Destination not on train route'
+          },
+          { status: 400 }
+        );
+      }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          booking,
-          intent,
-          vacancy,
-          message: 'Booking created. Proceed to payment.'
+      if (originIdx >= destIdx) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Destination must be after origin on route'
+          },
+          { status: 400 }
+        );
+      }
+
+      // Create booking
+      const booking = createBooking({
+        trainId,
+        origin,
+        destination,
+        cls,
+        date,
+        passenger,
+        berthPreference,
+        fare: fare || 0
+      });
+
+      // Create early-deboarding intent if declared
+      let intent = null;
+      let vacancy = null;
+
+      if (
+        earlyDeboarding?.enabled &&
+        earlyDeboarding?.station
+      ) {
+        try {
+          intent = createDeboardingIntent(
+            booking.id,
+            earlyDeboarding.station
+          );
+
+          vacancy = store.vacancies.find(
+            v => v.bookingId === booking.id
+          );
+        } catch (intentErr) {
+          // Rollback in-memory booking
+          store.bookings = store.bookings.filter(
+            b => b.id !== booking.id
+          );
+
+          // Persist rollback for this browser session
+          await persistStore(sessionId);
+
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Intent error: ${intentErr.message}`
+            },
+            { status: 400 }
+          );
         }
-      },
-      { status: 201 }
-    );
+      }
+
+      // Persist booking + intent + vacancy
+      await persistStore(sessionId);
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            booking,
+            intent,
+            vacancy,
+            message: 'Booking created. Proceed to payment.'
+          }
+        },
+        { status: 201 }
+      );
+    });
   } catch (err) {
     console.error('Booking API error:', err);
 
@@ -229,12 +236,17 @@ export async function POST(request) {
 
 export async function GET() {
   try {
-    // Load persistent state
-    const store = await initializeStore();
+    // Get this browser's session
+    const sessionId = await getOrCreateSessionId();
 
-    return NextResponse.json({
-      success: true,
-      data: store.bookings
+    return await runWithSessionStore(sessionId, async () => {
+      // Load persistent state for this browser session
+      const store = await initializeStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: store.bookings
+      });
     });
   } catch (err) {
     console.error('Get bookings error:', err);

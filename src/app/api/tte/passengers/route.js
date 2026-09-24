@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { initializeStore } from '@/lib/store';
 
 export async function GET(request) {
@@ -6,103 +8,107 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const trainId = searchParams.get('trainId');
 
-    // Load latest persistent RailFlow state
-    const store = await initializeStore();
+    // Load latest persistent RailFlow state for this browser session
+    const sessionId = await getOrCreateSessionId();
 
-    // Get all confirmed bookings with deboarding intents
-    let bookings = store.bookings.filter(
-      b =>
-        b.status === 'CONFIRMED' &&
-        b.deboardingIntentId
-    );
+    return await runWithSessionStore(sessionId, async () => {
+      const store = await initializeStore(sessionId);
 
-    if (trainId) {
-      bookings = bookings.filter(
-        b => b.trainId === trainId
-      );
-    }
-
-    const enriched = bookings.map(booking => {
-      const intent = store.deboardingIntents.find(
-        i => i.id === booking.deboardingIntentId
+      // Get all confirmed bookings with deboarding intents
+      let bookings = store.bookings.filter(
+        b =>
+          b.status === 'CONFIRMED' &&
+          b.deboardingIntentId
       );
 
-      const vacancy = store.vacancies.find(
-        v => v.bookingId === booking.id
-      );
+      if (trainId) {
+        bookings = bookings.filter(
+          b => b.trainId === trainId
+        );
+      }
 
-      const deboardStation = intent
-        ? store.stations.find(
-            s => s.code === intent.deboardingStation
-          )
-        : null;
+      const enriched = bookings.map(booking => {
+        const intent = store.deboardingIntents.find(
+          i => i.id === booking.deboardingIntentId
+        );
 
-      const originStation = store.stations.find(
-        s => s.code === booking.origin
-      );
+        const vacancy = store.vacancies.find(
+          v => v.bookingId === booking.id
+        );
 
-      const destStation = store.stations.find(
-        s => s.code === booking.destination
-      );
+        const deboardStation = intent
+          ? store.stations.find(
+              s => s.code === intent.deboardingStation
+            )
+          : null;
 
-      const allocation = vacancy
-        ? store.allocations.find(
-            a => a.vacancyId === vacancy.id
-          )
-        : null;
+        const originStation = store.stations.find(
+          s => s.code === booking.origin
+        );
 
-      return {
-        bookingId: booking.id,
-        pnr: booking.pnr,
-        trainId: booking.trainId,
-        trainNumber: booking.trainNumber,
-        passenger: booking.passenger,
+        const destStation = store.stations.find(
+          s => s.code === booking.destination
+        );
 
-        origin: booking.origin,
-        originName:
-          originStation?.name || booking.origin,
+        const allocation = vacancy
+          ? store.allocations.find(
+              a => a.vacancyId === vacancy.id
+            )
+          : null;
 
-        destination: booking.destination,
-        destinationName:
-          destStation?.name || booking.destination,
+        return {
+          bookingId: booking.id,
+          pnr: booking.pnr,
+          trainId: booking.trainId,
+          trainNumber: booking.trainNumber,
+          passenger: booking.passenger,
 
-        coach: booking.coach,
-        berth: booking.berth,
-        class: booking.class,
-        journeyDate: booking.journeyDate,
+          origin: booking.origin,
+          originName:
+            originStation?.name || booking.origin,
 
-        intent: intent
-          ? {
-              id: intent.id,
-              deboardingStation:
-                intent.deboardingStation,
-              deboardingStationName:
-                deboardStation?.name ||
-                intent.deboardingStation,
-              status: intent.status,
-              confidence: intent.confidence,
-              declaredAt: intent.declaredAt,
-              lockedAt: intent.lockedAt
-            }
-          : null,
+          destination: booking.destination,
+          destinationName:
+            destStation?.name || booking.destination,
 
-        vacancy: vacancy
-          ? {
-              id: vacancy.id,
-              status: vacancy.status,
-              confidence: vacancy.confidence,
-              fromStation: vacancy.fromStation,
-              toStation: vacancy.toStation
-            }
-          : null,
+          coach: booking.coach,
+          berth: booking.berth,
+          class: booking.class,
+          journeyDate: booking.journeyDate,
 
-        allocation: allocation || null
-      };
-    });
+          intent: intent
+            ? {
+                id: intent.id,
+                deboardingStation:
+                  intent.deboardingStation,
+                deboardingStationName:
+                  deboardStation?.name ||
+                  intent.deboardingStation,
+                status: intent.status,
+                confidence: intent.confidence,
+                declaredAt: intent.declaredAt,
+                lockedAt: intent.lockedAt
+              }
+            : null,
 
-    return NextResponse.json({
-      success: true,
-      data: enriched
+          vacancy: vacancy
+            ? {
+                id: vacancy.id,
+                status: vacancy.status,
+                confidence: vacancy.confidence,
+                fromStation: vacancy.fromStation,
+                toStation: vacancy.toStation
+              }
+            : null,
+
+          allocation: allocation || null
+        };
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: enriched
+      });
     });
 
   } catch (err) {

@@ -1,5 +1,8 @@
 // RailFlow state store
+
 // In-memory cache + Supabase persistence
+
+const { getCurrentSessionId } = require('./requestStoreContext');
 
 const {
   loadPersistedState,
@@ -7,7 +10,7 @@ const {
   clearPersistedState,
 } = require('./storePersistence');
 
-let store = null;
+const sessionStores = new Map();
 
 function getInitialStore() {
   return {
@@ -440,60 +443,86 @@ function seedDemoData(st) {
 }
 
 function getStore() {
-  if (!store) {
-    store = getInitialStore();
-    seedDemoData(store);
+  const sessionId = getCurrentSessionId();
+
+  if (!sessionId) {
+    throw new Error(
+      'RailFlow session context is missing. Use runWithSessionStore(sessionId, callback).'
+    );
   }
 
-  return store;
+  const sessionStore = sessionStores.get(sessionId);
+
+  if (!sessionStore) {
+    throw new Error(
+      'RailFlow store is not initialized for this session.'
+    );
+  }
+
+  return sessionStore;
 }
 
 /**
- * Load state from Supabase.
- *
- * IMPORTANT:
- * Existing application services can continue using
- * synchronous getStore() after this function has completed.
+ * Load state from Supabase for a specific session.
  */
-async function initializeStore() {
-  const persistedState = await loadPersistedState();
+async function initializeStore(sessionId) {
+  if (!sessionId) {
+    throw new Error('Session ID required');
+  }
+
+  const persistedState = await loadPersistedState(sessionId);
 
   if (persistedState) {
-    store = persistedState;
-    return store;
+    sessionStores.set(sessionId, persistedState);
+  } else {
+    const newStore = getInitialStore();
+    seedDemoData(newStore);
+
+    sessionStores.set(sessionId, newStore);
+
+    await savePersistedState(sessionId, newStore);
   }
 
-  store = getInitialStore();
-  seedDemoData(store);
-  await savePersistedState(store);
-
-  return store;
+  return sessionStores.get(sessionId);
 }
 
 /**
- * Persist the current in-memory state to Supabase.
+ * Persist the current session's in-memory state to Supabase.
  */
-async function persistStore() {
-  if (!store) {
-    store = getInitialStore();
-    seedDemoData(store);
+async function persistStore(sessionId) {
+  if (!sessionId) {
+    throw new Error('Session ID required');
   }
 
-  await savePersistedState(store);
+  const sessionStore = sessionStores.get(sessionId);
 
-  return store;
+  if (!sessionStore) {
+    throw new Error(
+      'RailFlow store is not initialized for this session.'
+    );
+  }
+
+  await savePersistedState(sessionId, sessionStore);
+
+  return sessionStore;
 }
 
 /**
- * Reset both memory and persistent database state.
+ * Reset only the current session's state.
  */
-async function resetStore() {
-  store = getInitialStore();
-  seedDemoData(store);
+async function resetStore(sessionId) {
+  if (!sessionId) {
+    throw new Error('Session ID required');
+  }
 
-  await savePersistedState(store);
+  const newStore = getInitialStore();
+  seedDemoData(newStore);
 
-  return store;
+  sessionStores.set(sessionId, newStore);
+
+  await savePersistedState(sessionId, newStore);
+
+  return newStore;
 }
 
 module.exports = {

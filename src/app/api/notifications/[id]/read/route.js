@@ -1,32 +1,40 @@
 import { NextResponse } from 'next/server';
+import { getOrCreateSessionId } from '@/lib/session';
+import { runWithSessionStore } from '@/lib/requestStoreContext';
 import { initializeStore, persistStore } from '@/lib/store';
 
 export async function POST(request, { params }) {
   try {
     const { id } = await params;
 
-    const store = await initializeStore();
+    const sessionId = await getOrCreateSessionId();
 
-    const notif = store.notifications.find(n => n.id === id);
+    return await runWithSessionStore(sessionId, async () => {
+      const store = await initializeStore(sessionId);
 
-    if (!notif) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Notification not found'
-        },
-        { status: 404 }
+      const notif = store.notifications.find(
+        n => n.id === id
       );
-    }
 
-    notif.status = 'READ';
-    notif.readAt = new Date().toISOString();
+      if (!notif) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Notification not found'
+          },
+          { status: 404 }
+        );
+      }
 
-    await persistStore();
+      notif.status = 'READ';
+      notif.readAt = new Date().toISOString();
 
-    return NextResponse.json({
-      success: true,
-      data: notif
+      await persistStore(sessionId);
+
+      return NextResponse.json({
+        success: true,
+        data: notif
+      });
     });
   } catch (err) {
     console.error('Mark notification as read error:', err);
