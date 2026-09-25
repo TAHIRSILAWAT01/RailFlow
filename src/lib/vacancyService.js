@@ -36,7 +36,20 @@ function verifyDeboarding(vacancyId, tteId, passengerDeboarded) {
       intent.verifiedAt = new Date().toISOString();
       intent.verifiedBy = tteId || 'TTE-001';
     }
+    // Mark the deboarding verification notification as READ.
+// This prevents the same notification from stopping the train again.
+const deboardingNotification = store.notifications.find(
+  n =>
+    n.bookingId === vacancy.bookingId &&
+    n.vacancyId === vacancy.id &&
+    n.type === 'DEBOARDING_VERIFICATION' &&
+    n.status === 'UNREAD'
+);
 
+  if (deboardingNotification) {
+  deboardingNotification.status = 'READ';
+  deboardingNotification.readAt = new Date().toISOString();
+}
     // Create verification record
     const verification = {
       id: generateId('VER'),
